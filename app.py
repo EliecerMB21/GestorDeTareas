@@ -1,9 +1,17 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+
+# Configuración para PostgreSQL en Render (con SSL)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL').replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {
+        'sslmode': 'require'  # ¡Obligatorio para Render!
+    }
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -15,17 +23,18 @@ class Task(db.Model):
     is_completed = db.Column(db.Boolean, default=False)
     priority = db.Column(db.String(10), default='Media')
 
-# Crear la base de datos (ejecutar solo una vez)
+# Crear tablas en PostgreSQL (ejecutar solo una vez)
 with app.app_context():
     db.create_all()
-    # Tarea de ejemplo
-    db.session.add(Task(
-        title="Ejemplo",
-        description="Mi primera tarea",
-        due_date=datetime.now().strftime("%Y-%m-%d"),
-        priority="Alta"
-    ))
-    db.session.commit()
+    # Opcional: Añadir tarea de ejemplo inicial (descomenta si lo necesitas)
+    # if not Task.query.first():
+    #     db.session.add(Task(
+    #         title="Tarea de ejemplo",
+    #         description="Esta es una tarea de prueba",
+    #         due_date=datetime.now().strftime("%Y-%m-%d"),
+    #         priority="Alta"
+    #     ))
+    #     db.session.commit()
 
 @app.route('/')
 def index():
