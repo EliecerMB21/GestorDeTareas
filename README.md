@@ -13,4 +13,4 @@ Aplicación web para organizar tareas académicas, desarrollada con Flask y desp
 - SQLite/PostgreSQL
 - Bootstrap 5
 
-  Link: https://gestordetareas-3ycu.onrender.com
+
