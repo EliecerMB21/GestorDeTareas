@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestor de Tareas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .task-card { transition: transform 0.2s; }
+        .task-card:hover { transform: scale(1.02); }
+    </style>
 </head>
 <body class="bg-light">
     <div class="container py-4">
         <header class="text-center mb-4">
-            <img src="{{ url_for('static', filename='image.jpg') }}" alt="Logo" class="rounded-circle mb-3" width="100">
-            <h1 class="display-5">Gestor Académico</h1>
+            <h1 class="display-5">📚 Gestor Académico</h1>
         </header>
 
+        <!-- Formulario -->
         <form action="/add" method="POST" enctype="multipart/form-data" class="bg-white p-4 rounded shadow-sm mb-4">
             <div class="row g-3">
                 <div class="col-md-3">
@@ -35,7 +38,8 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <input type="file" name="attachment" class="form-control">
+                    <input type="file" name="attachment" class="form-control" id="fileInput" onchange="previewFile()">
+                    <div id="filePreview" class="mt-2"></div>
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-success w-100">➕ Agregar</button>
@@ -43,7 +47,22 @@
             </div>
         </form>
 
+        <!-- Modal para vista previa -->
+        <div class="modal fade" id="previewModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">📄 Vista previa</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="modalPreviewContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección principal -->
         <div class="row">
+            <!-- Gráfico -->
             <div class="col-md-4 mb-4">
                 <div class="card shadow-sm">
                     <div class="card-body">
@@ -53,12 +72,13 @@
                 </div>
             </div>
 
+            <!-- Lista de tareas -->
             <div class="col-md-8">
                 {% for task in tasks %}
-                <div class="card mb-3 shadow-sm {% if task.is_completed %}bg-light{% endif %}">
+                <div class="card mb-3 shadow-sm task-card {% if task.is_completed %}bg-light{% endif %}">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="w-75">
                                 <h5 class="card-title">{{ task.title }}
                                     <span class="badge bg-{{ 'success' if task.difficulty == 'MUY_FACIL' 
                                                         else 'primary' if task.difficulty == 'FACIL'
@@ -68,18 +88,22 @@
                                         {{ task.difficulty|replace('_', ' ')|title }}
                                     </span>
                                 </h5>
-                                <p class="card-text">{{ task.description }}</p>
+                                <p class="card-text text-muted">{{ task.description }}</p>
                                 {% if task.attachment %}
                                 <div class="mt-2">
+                                    <button onclick="showFullPreview({{ task.id }})" 
+                                            class="btn btn-sm btn-outline-primary">
+                                        👁️ Ver archivo
+                                    </button>
                                     <a href="{{ url_for('download_attachment', task_id=task.id) }}" 
                                        class="btn btn-sm btn-outline-secondary">
-                                        📎 {{ task.attachment_filename }}
+                                        ⬇️ Descargar
                                     </a>
                                 </div>
                                 {% endif %}
-                                <small class="text-muted">📅 {{ task.due_date if task.due_date else "Sin fecha" }}</small>
+                                <small class="text-muted d-block mt-2">📅 {{ task.due_date if task.due_date else "Sin fecha límite" }}</small>
                             </div>
-                            <div class="btn-group">
+                            <div class="btn-group-vertical">
                                 <a href="/toggle/{{ task.id }}" 
                                    class="btn btn-sm {{ 'btn-outline-success' if task.is_completed else 'btn-success' }}">
                                     {{ '✓ Hecha' if task.is_completed else 'Marcar' }}
@@ -90,15 +114,45 @@
                     </div>
                 </div>
                 {% else %}
-                <div class="alert alert-info">¡No hay tareas pendientes! 🎉</div>
+                <div class="alert alert-info">🎉 ¡No hay tareas pendientes! ¡Buen trabajo!</div>
                 {% endfor %}
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Vista previa de archivo
+        function previewFile() {
+            const preview = document.getElementById('filePreview');
+            const file = document.getElementById('fileInput').files[0];
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                let content = '';
+                if (file.type.startsWith('image/')) {
+                    content = `<img src="${e.target.result}" class="img-fluid rounded" style="max-height: 150px">`;
+                } else if (file.type === 'text/plain') {
+                    content = `<pre class="bg-light p-3">${e.target.result}</pre>`;
+                } else if (file.type === 'application/pdf') {
+                    content = `<embed src="${e.target.result}" type="application/pdf" width="100%" height="400px">`;
+                } else {
+                    content = `<p class="text-muted">${file.name}</p>`;
+                }
+                preview.innerHTML = `
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            ${content}
+                            <small class="text-muted d-block mt-2">${(file.size/1024).toFixed(2)} KB</small>
+                        </div>
+                    </div>`;
+            };
+
+            if (file) reader.readAsDataURL(file);
+        }
+
         // Gráfico
         const ctx = document.getElementById('myChart');
         new Chart(ctx, {
@@ -107,23 +161,27 @@
                 labels: ['Completadas ({{ completed }})', 'Pendientes ({{ pending }})'],
                 datasets: [{
                     data: [{{ completed }}, {{ pending }}],
-                    backgroundColor: ['#28a745', '#dc3545'],
-                    borderWidth: 0
+                    backgroundColor: ['#28a745', '#ffc107'],
+                    borderWidth: 2
                 }]
             },
             options: {
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { position: 'bottom' },
+                    tooltip: { enabled: false }
                 }
             }
         });
 
-        // Easter Egg
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'm') {
-                alert('🎉 ¡Modo productividad activado!');
-            }
-        });
+        // Vista previa completa
+        function showFullPreview(taskId) {
+            fetch(`/preview/${taskId}`)
+                .then(response => response.text())
+                .then(content => {
+                    document.getElementById('modalPreviewContent').innerHTML = content;
+                    new bootstrap.Modal('#previewModal').show();
+                });
+        }
     </script>
 </body>
-</html>
+</html> 
